@@ -1,0 +1,684 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>استودیو طراحی کاراکتر سه‌بعدی | Stylized 3D Character Studio</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Three.js & OrbitControls -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+    <!-- Font Vazirmatn -->
+    <link href="https://cdn.jsdelivr.net/gh/rastikerdar/vazirmatn@v33.003/Vazirmatn-font-face.css" rel="stylesheet" type="text/css" />
+    <style>
+        body { font-family: 'Vazirmatn', sans-serif; background-color: #0b0f19; color: #f3f4f6; overflow-x: hidden; }
+        .glass-panel { background: rgba(17, 24, 39, 0.75); backdrop-filter: blur(16px); border: 1px solid rgba(255, 255, 255, 0.08); }
+        .custom-scrollbar::-webkit-scrollbar { width: 6px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.2); border-radius: 4px; }
+        input[type=range] { accent-color: #6366f1; }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col">
+
+    <!-- Header -->
+    <header class="glass-panel border-b border-gray-800 px-6 py-4 flex flex-wrap justify-between items-center z-20 shadow-lg">
+        <div class="flex items-center space-x-3 space-x-reverse">
+            <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-indigo-600 to-amber-500 flex items-center justify-center shadow-md">
+                <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.828 14.828a4 4 0 01-5.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+            </div>
+            <div>
+                <h1 class="text-lg font-bold bg-gradient-to-r from-white via-indigo-200 to-amber-300 bg-clip-text text-transparent">استودیو کاراکترساز سه‌بعدی</h1>
+                <p class="text-xs text-gray-400">سبک انیمیشنی پیکسار و دیزنی • کاریکاتور زنده • پرامپت‌ساز</p>
+            </div>
+        </div>
+        <div class="flex items-center gap-3 mt-2 sm:mt-0">
+            <button onclick="resetCharacter()" class="px-4 py-2 text-xs font-medium rounded-xl bg-gray-800 hover:bg-gray-700 text-gray-300 border border-gray-700 transition">بازنشانی پیش‌فرض</button>
+            <button onclick="exportPNG()" class="px-5 py-2 text-xs font-bold rounded-xl bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 text-white shadow-lg shadow-indigo-500/25 transition">خروجی PNG شفاف</button>
+            <button onclick="openGitHubModal()" class="px-4 py-2 text-xs font-semibold rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white shadow-lg shadow-emerald-500/25 transition flex items-center gap-1.5">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"></path></svg>
+                خروجی گیت‌هاب / نصب گوشی
+            </button>
+        </div>
+    </header>
+
+    <!-- Main Workspace -->
+    <main class="flex-1 grid grid-cols-1 lg:grid-cols-12 gap-4 p-4 max-w-[1700px] w-full mx-auto">
+        
+        <!-- 3D Viewport Column (7 cols) -->
+        <section class="lg:col-span-7 flex flex-col gap-3">
+            <div class="glass-panel relative rounded-2xl overflow-hidden flex-1 min-h-[480px] lg:min-h-[600px] flex items-center justify-center shadow-2xl">
+                <!-- Three.js Canvas Container -->
+                <div id="canvas-container" class="w-full h-full absolute inset-0 cursor-grab active:cursor-grabbing"></div>
+                
+                <!-- Floating Controls over 3D View -->
+                <div class="absolute top-4 right-4 flex flex-col gap-2 z-10">
+                    <button onclick="triggerBlink()" class="px-3 py-1.5 rounded-lg bg-black/60 hover:bg-black/80 backdrop-blur-md text-xs border border-white/10 text-gray-200 transition">چشمک زدن</button>
+                    <button onclick="toggleTalking()" id="btn-talk" class="px-3 py-1.5 rounded-lg bg-black/60 hover:bg-black/80 backdrop-blur-md text-xs border border-white/10 text-gray-200 transition">شبیه‌ساز صحبت</button>
+                    <button onclick="toggleAutoRotate()" id="btn-rotate" class="px-3 py-1.5 rounded-lg bg-indigo-600/80 hover:bg-indigo-600 backdrop-blur-md text-xs border border-indigo-400/30 text-white transition">چرخش خودکار</button>
+                </div>
+
+                <div class="absolute bottom-4 left-4 right-4 flex flex-wrap justify-between items-center gap-2 bg-black/50 backdrop-blur-md px-4 py-3 rounded-xl border border-white/10 z-10 text-xs">
+                    <div class="flex items-center gap-2">
+                        <span class="text-gray-400">زاویه دوربین:</span>
+                        <button onclick="setCameraView('front')" class="px-2.5 py-1 rounded bg-white/10 hover:bg-white/20 transition">روبرو</button>
+                        <button onclick="setCameraView('threeQuarter')" class="px-2.5 py-1 rounded bg-white/10 hover:bg-white/20 transition">سه‌رخ</button>
+                        <button onclick="setCameraView('side')" class="px-2.5 py-1 rounded bg-white/10 hover:bg-white/20 transition">نیم‌رخ</button>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <span class="text-gray-400">نورپردازی:</span>
+                        <select id="lighting-mode" onchange="changeLighting(this.value)" class="bg-gray-800 text-gray-200 border border-gray-700 rounded px-2 py-1 outline-none text-xs">
+                            <option value="warm">استودیویی گرم (ژپتویی)</option>
+                            <option value="cinematic">سینمایی دراماتیک</option>
+                            <option value="studio">سفید تمیز پیکسار</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Smart Prompt Panel -->
+            <div class="glass-panel p-4 rounded-2xl flex flex-col gap-2">
+                <div class="flex justify-between items-center">
+                    <span class="text-xs font-bold text-indigo-400 flex items-center gap-1.5">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
+                        پرامپت هوشمند سه‌بعدی (همگام با تنظیمات)
+                    </span>
+                    <button onclick="copyPrompt()" class="px-3 py-1 rounded-lg bg-indigo-600/20 hover:bg-indigo-600/40 text-indigo-300 border border-indigo-500/30 text-xs transition">کپی پرامپت</button>
+                </div>
+                <div id="prompt-box" class="bg-black/40 border border-gray-800 rounded-xl p-3 text-xs text-gray-300 font-mono select-all h-20 overflow-y-auto custom-scrollbar">
+                    در حال بارگذاری پرامپت...
+                </div>
+            </div>
+        </section>
+
+        <!-- Controls Column (5 cols) -->
+        <section class="lg:col-span-5 flex flex-col gap-3">
+            <div class="glass-panel rounded-2xl flex flex-col h-full overflow-hidden">
+                <!-- Tabs -->
+                <div class="flex border-b border-gray-800 bg-black/20">
+                    <button onclick="switchTab('face')" id="tab-btn-face" class="flex-1 py-3 text-xs font-bold text-indigo-400 border-b-2 border-indigo-500 bg-white/5 transition">اجزای صورت</button>
+                    <button onclick="switchTab('caricature')" id="tab-btn-caricature" class="flex-1 py-3 text-xs font-semibold text-gray-400 hover:text-white transition">اغراق کاریکاتوری</button>
+                    <button onclick="switchTab('style')" id="tab-btn-style" class="flex-1 py-3 text-xs font-semibold text-gray-400 hover:text-white transition">استایل و رنگ</button>
+                </div>
+
+                <!-- Tab Contents -->
+                <div class="p-4 flex-1 overflow-y-auto custom-scrollbar space-y-5 max-h-[620px]">
+                    
+                    <!-- TAB 1: Face Components -->
+                    <div id="tab-face" class="space-y-4">
+                        <div>
+                            <label class="text-xs text-gray-400 font-medium block mb-2">مدل مو و استایل سر</label>
+                            <div class="grid grid-cols-3 gap-2">
+                                <button onclick="setHairStyle('elderly')" id="hair-elderly" class="p-2.5 rounded-xl border border-indigo-500 bg-indigo-600/20 text-xs text-center text-indigo-200 transition">پیرمردی پرپشت</button>
+                                <button onclick="setHairStyle('curly')" id="hair-curly" class="p-2.5 rounded-xl border border-gray-700 bg-gray-800/50 text-xs text-center text-gray-300 hover:bg-gray-800 transition">فرفری موج‌دار</button>
+                                <button onclick="setHairStyle('bald')" id="hair-bald" class="p-2.5 rounded-xl border border-gray-700 bg-gray-800/50 text-xs text-center text-gray-300 hover:bg-gray-800 transition">کچل کلاسیک</button>
+                            </div>
+                        </div>
+
+                        <div>
+                            <label class="text-xs text-gray-400 font-medium block mb-2">ریش و سبیل</label>
+                            <div class="grid grid-cols-3 gap-2">
+                                <button onclick="setBeardStyle('full')" id="beard-full" class="p-2.5 rounded-xl border border-indigo-500 bg-indigo-600/20 text-xs text-center text-indigo-200 transition">ریش و سبیل پرپشت</button>
+                                <button onclick="setBeardStyle('mustache')" id="beard-mustache" class="p-2.5 rounded-xl border border-gray-700 bg-gray-800/50 text-xs text-center text-gray-300 hover:bg-gray-800 transition">سبیل تاب‌دار</button>
+                                <button onclick="setBeardStyle('clean')" id="beard-clean" class="p-2.5 rounded-xl border border-gray-700 bg-gray-800/50 text-xs text-center text-gray-300 hover:bg-gray-800 transition">بدون ریش</button>
+                            </div>
+                        </div>
+
+                        <div>
+                            <label class="text-xs text-gray-400 font-medium block mb-2">عینک و اکسسوری</label>
+                            <div class="grid grid-cols-3 gap-2">
+                                <button onclick="setAccessory('round')" id="acc-round" class="p-2.5 rounded-xl border border-indigo-500 bg-indigo-600/20 text-xs text-center text-indigo-200 transition">عینک گرد کلاسیک</button>
+                                <button onclick="setAccessory('smart')" id="acc-smart" class="p-2.5 rounded-xl border border-gray-700 bg-gray-800/50 text-xs text-center text-gray-300 hover:bg-gray-800 transition">عینک ضخیم فانتزی</button>
+                                <button onclick="setAccessory('none')" id="acc-none" class="p-2.5 rounded-xl border border-gray-700 bg-gray-800/50 text-xs text-center text-gray-300 hover:bg-gray-800 transition">بدون عینک</button>
+                            </div>
+                        </div>
+
+                        <div>
+                            <label class="text-xs text-gray-400 font-medium block mb-2">حالت چهره (Emotion)</label>
+                            <div class="grid grid-cols-3 gap-2">
+                                <button onclick="setEmotion('happy')" class="p-2.5 rounded-xl border border-gray-700 bg-gray-800/50 text-xs text-center text-gray-300 hover:bg-indigo-600/20 transition">لبخند مهربان</button>
+                                <button onclick="setEmotion('surprised')" class="p-2.5 rounded-xl border border-gray-700 bg-gray-800/50 text-xs text-center text-gray-300 hover:bg-indigo-600/20 transition">متعجب / گیج</button>
+                                <button onclick="setEmotion('confident')" class="p-2.5 rounded-xl border border-gray-700 bg-gray-800/50 text-xs text-center text-gray-300 hover:bg-indigo-600/20 transition">خونسرد / متفکر</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- TAB 2: Caricature & Morphing -->
+                    <div id="tab-caricature" class="space-y-4 hidden">
+                        <div class="flex justify-between items-center mb-2">
+                            <span class="text-xs text-gray-300 font-bold">تنظیمات اغراق و تناسبات صورت</span>
+                            <button onclick="randomizeCaricature()" class="px-3 py-1 rounded-lg bg-amber-500/20 text-amber-300 border border-amber-500/30 text-xs hover:bg-amber-500/30 transition">کاریکاتور تصادفی!</button>
+                        </div>
+                        
+                        <div class="space-y-3 bg-black/30 p-3 rounded-xl border border-gray-800">
+                            <div>
+                                <div class="flex justify-between text-xs text-gray-400 mb-1">
+                                    <span>بزرگی و برجستگی بینی</span>
+                                    <span id="val-nose">1.0</span>
+                                </div>
+                                <input type="range" min="0.6" max="1.8" step="0.1" value="1.0" oninput="updateCaricature('nose', this.value)" class="w-full">
+                            </div>
+
+                            <div>
+                                <div class="flex justify-between text-xs text-gray-400 mb-1">
+                                    <span>اندازه و ضخامت گوش‌ها</span>
+                                    <span id="val-ears">1.0</span>
+                                </div>
+                                <input type="range" min="0.7" max="1.6" step="0.1" value="1.0" oninput="updateCaricature('ears', this.value)" class="w-full">
+                            </div>
+
+                            <div>
+                                <div class="flex justify-between text-xs text-gray-400 mb-1">
+                                    <span>برجستگی و کشیدگی چانه و فک</span>
+                                    <span id="val-jaw">1.0</span>
+                                </div>
+                                <input type="range" min="0.7" max="1.5" step="0.1" value="1.0" oninput="updateCaricature('jaw', this.value)" class="w-full">
+                            </div>
+
+                            <div>
+                                <div class="flex justify-between text-xs text-gray-400 mb-1">
+                                    <span>درشتی چشم‌ها و ابروها</span>
+                                    <span id="val-eyes">1.0</span>
+                                </div>
+                                <input type="range" min="0.8" max="1.4" step="0.1" value="1.0" oninput="updateCaricature('eyes', this.value)" class="w-full">
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- TAB 3: Style & Theme -->
+                    <div id="tab-style" class="space-y-4 hidden">
+                        <div>
+                            <label class="text-xs text-gray-400 font-medium block mb-2">رنگ مو و ریش</label>
+                            <div class="grid grid-cols-4 gap-2">
+                                <button onclick="setHairColor('#f3f4f6')" class="p-3 rounded-xl bg-gray-100 border border-gray-600 text-xs text-black font-bold">سفید برفی</button>
+                                <button onclick="setHairColor('#374151')" class="p-3 rounded-xl bg-gray-700 border border-gray-600 text-xs text-white">خاکستری تیره</button>
+                                <button onclick="setHairColor('#b45309')" class="p-3 rounded-xl bg-amber-700 border border-gray-600 text-xs text-white">قهوه‌ای گرم</button>
+                                <button onclick="setHairColor('#1f2937')" class="p-3 rounded-xl bg-gray-900 border border-gray-600 text-xs text-white">مشکی زغالی</button>
+                            </div>
+                        </div>
+
+                        <div>
+                            <label class="text-xs text-gray-400 font-medium block mb-2">پالت لباس کاراکتر (Vest / Shirt)</label>
+                            <div class="grid grid-cols-4 gap-2">
+                                <button onclick="setOutfitColor('#78350f')" class="p-3 rounded-xl bg-amber-900 border border-amber-700 text-xs text-white">جلیقه چرمی قهوه‌ای</button>
+                                <button onclick="setOutfitColor('#1e3a8a')" class="p-3 rounded-xl bg-blue-900 border border-blue-700 text-xs text-white">کت کلاسیک سورمه‌ای</button>
+                                <button onclick="setOutfitColor('#065f46')" class="p-3 rounded-xl bg-emerald-800 border border-emerald-600 text-xs text-white">پلیور پشمی سبز</button>
+                                <button onclick="setOutfitColor('#374151')" class="p-3 rounded-xl bg-gray-700 border border-gray-600 text-xs text-white">پیراهن رسمی خاکستری</button>
+                            </div>
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- Modal for PNG Preview / Download -->
+    <div id="preview-modal" class="fixed inset-0 bg-black/80 backdrop-blur-md hidden items-center justify-center z-50 p-4">
+        <div class="glass-panel max-w-lg w-full p-6 rounded-3xl flex flex-col items-center gap-4 border border-indigo-500/30">
+            <h3 class="text-base font-bold text-white">تصویر خروجی کاراکتر (PNG 1024x1024)</h3>
+            <div id="modal-img-container" class="w-72 h-72 rounded-2xl overflow-hidden border border-gray-700 bg-black/50 flex items-center justify-center relative">
+                <div class="text-xs text-gray-400 animate-pulse">در حال رندر تصویر باکیفیت...</div>
+            </div>
+            <p class="text-xs text-gray-400 text-center">روی تصویر نگه دارید و Save Image را بزنید، یا از دکمه زیر استفاده کنید.</p>
+            <div class="flex gap-3 w-full">
+                <button onclick="closePreviewModal()" class="flex-1 py-2.5 rounded-xl bg-gray-800 hover:bg-gray-700 text-xs font-medium text-gray-300 transition">بستن</button>
+                <a id="download-link-btn" download="3d-character-render.png" class="flex-1 py-2.5 text-center rounded-xl bg-indigo-600 hover:bg-indigo-500 text-xs font-bold text-white shadow-lg transition">دانلود مستقیم فایل</a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal for GitHub / PWA Export -->
+    <div id="github-modal" class="fixed inset-0 bg-black/80 backdrop-blur-md hidden items-center justify-center z-50 p-4">
+        <div class="glass-panel max-w-xl w-full p-6 rounded-3xl flex flex-col gap-4 border border-emerald-500/30">
+            <div class="flex justify-between items-center">
+                <h3 class="text-base font-bold text-white flex items-center gap-2">
+                    <svg class="w-5 h-5 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4"></path></svg>
+                    خروجی کد کامل گیت‌هاب و نصب روی گوشی
+                </h3>
+                <button onclick="closeGitHubModal()" class="text-gray-400 hover:text-white">&times;</button>
+            </div>
+            <p class="text-xs text-gray-300 leading-relaxed">
+                این اپلیکیشن کاملاً در یک فایل تک‌صفحه‌ای (`index.html`) پیاده‌سازی شده است. می‌توانید دکمه زیر را بزنید تا کل کد را کپی کرده، در ریپازیتوری گیت‌هاب خود ذخیره کنید و از طریق <strong class="text-emerald-400">GitHub Pages</strong> روی موبایل (اندروید و آیفون) نصب کنید.
+            </p>
+            <textarea id="github-code-area" readonly class="w-full h-36 bg-black/50 border border-gray-700 rounded-xl p-3 text-[11px] font-mono text-emerald-300 outline-none custom-scrollbar select-all"></textarea>
+            <button onclick="copyGitHubCode()" class="w-full py-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-xs font-bold text-white shadow-lg shadow-emerald-500/20 transition">کپی کل کد پروژه برای گیت‌هاب</button>
+        </div>
+    </div>
+
+    <!-- Three.js App Script -->
+    <script>
+        let scene, camera, renderer, controls;
+        let characterGroup, headMesh, noseMesh, leftEarMesh, rightEarMesh, jawMesh, leftEyeMesh, rightEyeMesh, hairGroup, beardGroup, accessoryGroup;
+        
+        let state = {
+            hair: 'elderly',
+            beard: 'full',
+            accessory: 'round',
+            emotion: 'happy',
+            hairColor: 0xf3f4f6,
+            outfitColor: 0x78350f,
+            lighting: 'warm',
+            noseScale: 1.0,
+            earsScale: 1.0,
+            jawScale: 1.0,
+            eyesScale: 1.0,
+            isAutoRotate: true,
+            isTalking: false,
+            isBlinking: false
+        };
+
+        let clock = new THREE.Clock();
+
+        function init3D() {
+            const container = document.getElementById('canvas-container');
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(0x0f172a);
+
+            camera = new THREE.PerspectiveCamera(45, container.clientWidth / container.clientHeight, 0.1, 1000);
+            camera.position.set(0, 1.2, 4.2);
+
+            renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true, alpha: true });
+            renderer.setSize(container.clientWidth, container.clientHeight);
+            renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+            renderer.shadowMap.enabled = true;
+            container.appendChild(renderer.domElement);
+
+            controls = new THREE.OrbitControls(camera, renderer.domElement);
+            controls.enableDamping = true;
+            controls.dampingFactor = 0.05;
+            controls.maxPolarAngle = Math.PI / 2 + 0.1;
+            controls.minDistance = 2;
+            controls.maxDistance = 7;
+
+            setupLighting();
+            buildCharacter();
+
+            window.addEventListener('resize', onWindowResize);
+            animate();
+            updatePromptText();
+        }
+
+        let keyLight, fillLight, rimLight;
+        function setupLighting() {
+            // Remove previous lights if any
+            scene.children.forEach(child => {
+                if (child.isLight) scene.remove(child);
+            });
+
+            const ambient = new THREE.AmbientLight(0xffffff, 0.6);
+            scene.add(ambient);
+
+            keyLight = new THREE.DirectionalLight(0xffedd5, 1.8);
+            keyLight.position.set(3, 4, 3);
+            scene.add(keyLight);
+
+            fillLight = new THREE.DirectionalLight(0x93c5fd, 0.8);
+            fillLight.position.set(-3, 2, 2);
+            scene.add(fillLight);
+
+            rimLight = new THREE.DirectionalLight(0xc084fc, 1.2);
+            rimLight.position.set(0, 3, -3);
+            scene.add(rimLight);
+        }
+
+        function changeLighting(mode) {
+            state.lighting = mode;
+            if (mode === 'warm') {
+                keyLight.color.setHex(0xffedd5);
+                keyLight.intensity = 1.8;
+                scene.background.setHex(0x0f172a);
+            } else if (mode === 'cinematic') {
+                keyLight.color.setHex(0xfcd34d);
+                keyLight.intensity = 2.2;
+                scene.background.setHex(0x050508);
+            } else {
+                keyLight.color.setHex(0xffffff);
+                keyLight.intensity = 1.5;
+                scene.background.setHex(0x1e293b);
+            }
+            updatePromptText();
+        }
+
+        function buildCharacter() {
+            if (characterGroup) scene.remove(characterGroup);
+            characterGroup = new THREE.Group();
+
+            // Materials (Pixar Stylized Clay / Subsurface look)
+            const skinMat = new THREE.MeshStandardMaterial({ color: 0xf5d0b1, roughness: 0.4, metalness: 0.05 });
+            const outfitMat = new THREE.MeshStandardMaterial({ color: state.outfitColor, roughness: 0.6 });
+            const hairMat = new THREE.MeshStandardMaterial({ color: state.hairColor, roughness: 0.7 });
+            const metalMat = new THREE.MeshStandardMaterial({ color: 0xd4d4d8, metalness: 0.8, roughness: 0.2 });
+
+            // Torso & Vest
+            const torsoGeo = new THREE.CylinderGeometry(0.6, 0.8, 1.4, 32);
+            const torso = new THREE.Mesh(torsoGeo, outfitMat);
+            torso.position.y = -1.2;
+            characterGroup.add(torso);
+
+            // Head (Stylized egg shape)
+            const headGeo = new THREE.SphereGeometry(0.75, 32, 32);
+            headGeo.scale(1, 1.2, 1.1);
+            headMesh = new THREE.Mesh(headGeo, skinMat);
+            headMesh.position.y = 0.2;
+            characterGroup.add(headMesh);
+
+            // Nose (Caricature morphable)
+            const noseGeo = new THREE.SphereGeometry(0.25, 16, 16);
+            noseGeo.scale(1, 1.4, 1.8);
+            noseMesh = new THREE.Mesh(noseGeo, skinMat);
+            noseMesh.position.set(0, 0.15, 0.75);
+            noseMesh.scale.set(state.noseScale, state.noseScale, state.noseScale);
+            characterGroup.add(noseMesh);
+
+            // Ears
+            const earGeo = new THREE.SphereGeometry(0.22, 16, 16);
+            earGeo.scale(0.5, 1.2, 1);
+            leftEarMesh = new THREE.Mesh(earGeo, skinMat);
+            leftEarMesh.position.set(0.78, 0.2, 0);
+            leftEarMesh.rotation.y = -0.3;
+            leftEarMesh.scale.set(state.earsScale, state.earsScale, state.earsScale);
+            characterGroup.add(leftEarMesh);
+
+            rightEarMesh = leftEarMesh.clone();
+            rightEarMesh.position.x = -0.78;
+            rightEarMesh.rotation.y = 0.3;
+            characterGroup.add(rightEarMesh);
+
+            // Jaw & Chin
+            const jawGeo = new THREE.BoxGeometry(0.7, 0.5, 0.8);
+            jawMesh = new THREE.Mesh(jawGeo, skinMat);
+            jawMesh.position.set(0, -0.5, 0.2);
+            jawMesh.scale.set(1, state.jawScale, 1);
+            characterGroup.add(jawMesh);
+
+            // Eyes Group
+            const eyeGeo = new THREE.SphereGeometry(0.14, 32, 32);
+            const pupilGeo = new THREE.SphereGeometry(0.07, 16, 16);
+            const eyeMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
+            const pupilMat = new THREE.MeshBasicMaterial({ color: 0x1e293b });
+
+            const leftEyeGroup = new THREE.Group();
+            const le = new THREE.Mesh(eyeGeo, eyeMat);
+            const lp = new THREE.Mesh(pupilGeo, pupilMat);
+            lp.position.set(0, 0, 0.09);
+            leftEyeGroup.add(le, lp);
+            leftEyeGroup.position.set(0.3, 0.35, 0.62);
+            leftEyeGroup.scale.set(state.eyesScale, state.eyesScale, state.eyesScale);
+            characterGroup.add(leftEyeGroup);
+            leftEyeMesh = leftEyeGroup;
+
+            const rightEyeGroup = leftEyeGroup.clone();
+            rightEyeGroup.position.x = -0.3;
+            characterGroup.add(rightEyeGroup);
+            rightEyeMesh = rightEyeGroup;
+
+            // Hair & Beard & Accessories
+            buildHair(hairMat);
+            buildBeard(hairMat);
+            buildAccessories(metalMat);
+
+            scene.add(characterGroup);
+        }
+
+        function buildHair(mat) {
+            hairGroup = new THREE.Group();
+            if (state.hair === 'elderly') {
+                const h1 = new THREE.Mesh(new THREE.SphereGeometry(0.65, 16, 16), mat);
+                h1.position.set(0, 0.7, -0.1);
+                h1.scale.set(1.1, 0.8, 1.2);
+                hairGroup.add(h1);
+            } else if (state.hair === 'curly') {
+                for (let i = 0; i < 12; i++) {
+                    const c = new THREE.Mesh(new THREE.SphereGeometry(0.25, 8, 8), mat);
+                    const angle = (i / 12) * Math.PI * 2;
+                    c.position.set(Math.cos(angle) * 0.5, 0.8 + Math.sin(i) * 0.1, Math.sin(angle) * 0.5);
+                    hairGroup.add(c);
+                }
+            }
+            characterGroup.add(hairGroup);
+        }
+
+        function buildBeard(mat) {
+            beardGroup = new THREE.Group();
+            if (state.beard === 'full') {
+                const beardMesh = new THREE.Mesh(new THREE.ConeGeometry(0.7, 0.9, 16), mat);
+                beardMesh.position.set(0, -0.5, 0.5);
+                beardMesh.rotation.x = 0.3;
+                beardGroup.add(beardMesh);
+            } else if (state.beard === 'mustache') {
+                const mus = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.08, 0.8, 16), mat);
+                mus.position.set(0, 0.02, 0.8);
+                mus.rotation.z = Math.PI / 2;
+                beardGroup.add(mus);
+            }
+            characterGroup.add(beardGroup);
+        }
+
+        function buildAccessories(mat) {
+            accessoryGroup = new THREE.Group();
+            if (state.accessory === 'round') {
+                const rimGeo = new THREE.TorusGeometry(0.18, 0.02, 16, 32);
+                const lRim = new THREE.Mesh(rimGeo, mat);
+                lRim.position.set(0.3, 0.35, 0.72);
+                const rRim = lRim.clone();
+                rRim.position.x = -0.3;
+                const bridge = new THREE.Mesh(new THREE.CylinderGeometry(0.015, 0.015, 0.25, 8), mat);
+                bridge.position.set(0, 0.38, 0.75);
+                bridge.rotation.z = Math.PI / 2;
+                accessoryGroup.add(lRim, rRim, bridge);
+            } else if (state.accessory === 'smart') {
+                const boxGeo = new THREE.BoxGeometry(0.4, 0.3, 0.05);
+                const lBox = new THREE.Mesh(boxGeo, mat);
+                lBox.position.set(0.3, 0.35, 0.72);
+                const rBox = lBox.clone();
+                rBox.position.x = -0.3;
+                accessoryGroup.add(lBox, rBox);
+            }
+            characterGroup.add(accessoryGroup);
+        }
+
+        // UI Interactions & State Handlers
+        function switchTab(tab) {
+            ['face', 'caricature', 'style'].forEach(t => {
+                document.getElementById(`tab-${t}`).classList.add('hidden');
+                document.getElementById(`tab-btn-${t}`).classList.remove('border-b-2', 'border-indigo-500', 'text-indigo-400', 'bg-white/5');
+                document.getElementById(`tab-btn-${t}`).classList.add('text-gray-400');
+            });
+            document.getElementById(`tab-${tab}`).classList.remove('hidden');
+            document.getElementById(`tab-btn-${tab}`).classList.add('border-b-2', 'border-indigo-500', 'text-indigo-400', 'bg-white/5');
+            document.getElementById(`tab-btn-${tab}`).classList.remove('text-gray-400');
+        }
+
+        function setHairStyle(type) {
+            state.hair = type;
+            ['elderly', 'curly', 'bald'].forEach(t => {
+                const btn = document.getElementById(`hair-${t}`);
+                btn.className = t === type ? "p-2.5 rounded-xl border border-indigo-500 bg-indigo-600/20 text-xs text-center text-indigo-200 transition" : "p-2.5 rounded-xl border border-gray-700 bg-gray-800/50 text-xs text-center text-gray-300 hover:bg-gray-800 transition";
+            });
+            buildCharacter();
+            updatePromptText();
+        }
+
+        function setBeardStyle(type) {
+            state.beard = type;
+            ['full', 'mustache', 'clean'].forEach(t => {
+                const btn = document.getElementById(`beard-${t}`);
+                btn.className = t === type ? "p-2.5 rounded-xl border border-indigo-500 bg-indigo-600/20 text-xs text-center text-indigo-200 transition" : "p-2.5 rounded-xl border border-gray-700 bg-gray-800/50 text-xs text-center text-gray-300 hover:bg-gray-800 transition";
+            });
+            buildCharacter();
+            updatePromptText();
+        }
+
+        function setAccessory(type) {
+            state.accessory = type;
+            ['round', 'smart', 'none'].forEach(t => {
+                const btn = document.getElementById(`acc-${t}`);
+                btn.className = t === type ? "p-2.5 rounded-xl border border-indigo-500 bg-indigo-600/20 text-xs text-center text-indigo-200 transition" : "p-2.5 rounded-xl border border-gray-700 bg-gray-800/50 text-xs text-center text-gray-300 hover:bg-gray-800 transition";
+            });
+            buildCharacter();
+            updatePromptText();
+        }
+
+        function setEmotion(em) {
+            state.emotion = em;
+            if (em === 'happy') headMesh.rotation.x = 0;
+            if (em === 'surprised') headMesh.rotation.x = -0.15;
+            if (em === 'confident') headMesh.rotation.x = 0.1;
+            updatePromptText();
+        }
+
+        function setHairColor(hex) {
+            state.hairColor = hex;
+            buildCharacter();
+            updatePromptText();
+        }
+
+        function setOutfitColor(hex) {
+            state.outfitColor = hex;
+            buildCharacter();
+            updatePromptText();
+        }
+
+        function updateCaricature(part, val) {
+            if (part === 'nose') { state.noseScale = parseFloat(val); document.getElementById('val-nose').innerText = val; if (noseMesh) noseMesh.scale.set(val, val, val); }
+            if (part === 'ears') { state.earsScale = parseFloat(val); document.getElementById('val-ears').innerText = val; if (leftEarMesh) { leftEarMesh.scale.set(val, val, val); rightEarMesh.scale.set(val, val, val); } }
+            if (part === 'jaw') { state.jawScale = parseFloat(val); document.getElementById('val-jaw').innerText = val; if (jawMesh) jawMesh.scale.set(1, val, 1); }
+            if (part === 'eyes') { state.eyesScale = parseFloat(val); document.getElementById('val-eyes').innerText = val; if (leftEyeMesh) { leftEyeMesh.scale.set(val, val, val); rightEyeMesh.scale.set(val, val, val); } }
+            updatePromptText();
+        }
+
+        function randomizeCaricature() {
+            const n = (Math.random() * 0.8 + 0.8).toFixed(1);
+            const e = (Math.random() * 0.6 + 0.8).toFixed(1);
+            const j = (Math.random() * 0.6 + 0.8).toFixed(1);
+            const ey = (Math.random() * 0.4 + 0.9).toFixed(1);
+            updateCaricature('nose', n);
+            updateCaricature('ears', e);
+            updateCaricature('jaw', j);
+            updateCaricature('eyes', ey);
+        }
+
+        function toggleAutoRotate() {
+            state.isAutoRotate = !state.isAutoRotate;
+            const btn = document.getElementById('btn-rotate');
+            btn.className = state.isAutoRotate ? "px-3 py-1.5 rounded-lg bg-indigo-600/80 hover:bg-indigo-600 backdrop-blur-md text-xs border border-indigo-400/30 text-white transition" : "px-3 py-1.5 rounded-lg bg-black/60 hover:bg-black/80 backdrop-blur-md text-xs border border-white/10 text-gray-200 transition";
+        }
+
+        function triggerBlink() {
+            state.isBlinking = true;
+            setTimeout(() => { state.isBlinking = false; }, 250);
+        }
+
+        function toggleTalking() {
+            state.isTalking = !state.isTalking;
+            const btn = document.getElementById('btn-talk');
+            btn.className = state.isTalking ? "px-3 py-1.5 rounded-lg bg-amber-600 text-white backdrop-blur-md text-xs border border-amber-400/30 transition" : "px-3 py-1.5 rounded-lg bg-black/60 hover:bg-black/80 backdrop-blur-md text-xs border border-white/10 text-gray-200 transition";
+        }
+
+        function setCameraView(view) {
+            if (view === 'front') camera.position.set(0, 1.2, 4);
+            if (view === 'threeQuarter') camera.position.set(2.5, 1.5, 3);
+            if (view === 'side') camera.position.set(4, 1.2, 0);
+            controls.target.set(0, 0, 0);
+        }
+
+        function animate() {
+            requestAnimationFrame(animate);
+            const delta = clock.getDelta();
+            const time = clock.getElapsedTime();
+
+            if (characterGroup) {
+                // Idle breathing
+                characterGroup.position.y = Math.sin(time * 2) * 0.03;
+                
+                // Auto rotate
+                if (state.isAutoRotate && !controls.state === -1) {
+                    characterGroup.rotation.y += 0.005;
+                }
+
+                // Blinking animation
+                if (leftEyeMesh && rightEyeMesh) {
+                    const scaleY = (state.isBlinking || Math.sin(time * 1.5) > 0.95) ? 0.1 : 1.0;
+                    leftEyeMesh.scale.y = state.eyesScale * scaleY;
+                    rightEyeMesh.scale.y = state.eyesScale * scaleY;
+                }
+
+                // Talking jaw animation
+                if (jawMesh) {
+                    jawMesh.position.y = state.isTalking ? -0.5 + Math.sin(time * 20) * 0.05 : -0.5;
+                }
+            }
+
+            controls.update();
+            renderer.render(scene, camera);
+        }
+
+        function onWindowResize() {
+            const container = document.getElementById('canvas-container');
+            camera.aspect = container.clientWidth / container.clientHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(container.clientWidth, container.clientHeight);
+        }
+
+        function updatePromptText() {
+            const hairDesc = state.hair === 'elderly' ? 'voluminous messy elderly white hair' : state.hair === 'curly' ? 'curly wavy stylish hair' : 'bald smooth head';
+            const beardDesc = state.beard === 'full' ? 'thick bushy white curly beard and mustache' : state.beard === 'mustache' ? 'classic handlebar mustache' : 'clean shaven face';
+            const accDesc = state.accessory === 'round' ? 'vintage round wire-rimmed glasses' : state.accessory === 'smart' ? 'thick-rimmed stylized artistic glasses' : '';
+            const prompt = `Pixar style 3D character render, highly detailed stylized facial features, ${hairDesc}, ${beardDesc}, ${accDesc}, exaggerated caricature proportions with prominent nose and expressive big eyes, subsurface scattering claymation aesthetic, cinematic studio warm lighting, 8k resolution, Unreal Engine 5 render, character sheet concept art.`;
+            document.getElementById('prompt-box').innerText = prompt;
+            document.getElementById('github-code-area').value = document.documentElement.outerHTML;
+        }
+
+        function copyPrompt() {
+            const text = document.getElementById('prompt-box').innerText;
+            navigator.clipboard.writeText(text);
+            alert('پرامپت هوشمند با موفقیت کپی شد!');
+        }
+
+        function exportPNG() {
+            renderer.render(scene, camera);
+            const dataURL = renderer.domElement.toDataURL('image/png');
+            const modal = document.getElementById('preview-modal');
+            const container = document.getElementById('modal-img-container');
+            container.innerHTML = `<img src="${dataURL}" class="w-full h-full object-cover rounded-xl">`;
+            document.getElementById('download-link-btn').href = dataURL;
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+        }
+
+        function closePreviewModal() {
+            document.getElementById('preview-modal').classList.remove('flex');
+            document.getElementById('preview-modal').classList.add('hidden');
+        }
+
+        function openGitHubModal() {
+            document.getElementById('github-modal').classList.remove('hidden');
+            document.getElementById('github-modal').classList.add('flex');
+        }
+
+        function closeGitHubModal() {
+            document.getElementById('github-modal').classList.remove('flex');
+            document.getElementById('github-modal').classList.add('hidden');
+        }
+
+        function copyGitHubCode() {
+            const textarea = document.getElementById('github-code-area');
+            textarea.select();
+            navigator.clipboard.writeText(textarea.value);
+            alert('کد کامل پروژه کپی شد! می‌توانید آن را در گیت‌هاب قرار دهید.');
+        }
+
+        function resetCharacter() {
+            setHairStyle('elderly');
+            setBeardStyle('full');
+            setAccessory('round');
+            setEmotion('happy');
+            randomizeCaricature();
+        }
+
+        window.onload = init3D;
+    </script>
+</body>
+</html>
